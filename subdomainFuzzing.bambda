@@ -1,0 +1,87 @@
+// Copy Request to ffuf - Subdomain Fuzzing Mode
+// Location: Repeater | Function: Custom Action
+// Purpose: Discover subdomains using DNS fuzzing
+
+// ========== CONFIGURATION ==========
+// Set your ffuf tool path here
+var FFUF_PATH = "ffuf"; // If ffuf is in PATH, just use "ffuf"
+// var FFUF_PATH = "/usr/bin/ffuf";
+// var FFUF_PATH = System.getProperty("user.home") + "/tools/ffuf";
+
+// Set your default wordlist path for subdomain discovery
+var WORDLIST_PATH = "/usr/share/wordlists/seclists/Discovery/DNS/subdomains-top1million-110000.txt";
+// var WORDLIST_PATH = "/usr/share/wordlists/seclists/Discovery/DNS/subdomains-top1million-20000.txt";
+// var WORDLIST_PATH = "/usr/share/wordlists/seclists/Discovery/DNS/subdomains-top1million-110000.txt";
+// var WORDLIST_PATH = "/usr/share/wordlists/seclists/Discovery/DNS/fierce-hostlist.txt";
+
+// Output settings
+var OUTPUT_FORMAT = "html"; // json, csv, html, md (recommended: html or md for readability)
+// ===================================
+
+var request = requestResponse.request();
+
+// Check Host header from the actual request headers
+var hostFromHeader = "";
+var headers = request.headers();
+for (var header : headers) {
+    if (header.name().equalsIgnoreCase("Host")) {
+        hostFromHeader = header.value();
+        break;
+    }
+}
+
+// If no Host header found or doesn't contain FUZZ, check httpService
+if (hostFromHeader.isEmpty() || !hostFromHeader.toUpperCase().contains("FUZZ")) {
+    // Fallback to httpService host
+    var serviceHost = request.httpService().host();
+    if (!serviceHost.toUpperCase().contains("FUZZ")) {
+        api.logging().logToError("✗ FUZZ keyword not found - modify Host header to include FUZZ (e.g., FUZZ.domain.com)");
+        return;
+    }
+    hostFromHeader = serviceHost;
+}
+
+// Build the URL with protocol and host
+var protocol = request.httpService().secure() ? "https" : "http";
+var port = request.httpService().port();
+var urlString = protocol + "://" + hostFromHeader;
+
+// Add port if not default
+if ((protocol.equals("http") && port != 80) || (protocol.equals("https") && port != 443)) {
+    urlString += ":" + port;
+}
+
+// Add path from the request
+var path = request.path();
+if (path != null && !path.isEmpty()) {
+    urlString += path;
+}
+
+try {
+    // Build ffuf command with URL directly
+    var ffufCommand = FFUF_PATH + " -w \"" + WORDLIST_PATH + ":FUZZ\"";
+    ffufCommand += " -u \"" + urlString + "\"";
+    
+    // Add output file
+    var userHome = System.getProperty("user.home");
+    var timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+    var sanitizedHost = hostFromHeader.replaceAll("[^a-zA-Z0-9.-]", "_");
+    var outputFilename = "subdomain_" + sanitizedHost + "_" + timestamp + "." + OUTPUT_FORMAT;
+    var resultsDir = new java.io.File(userHome, "ffuf_results");
+    if (!resultsDir.exists()) {
+        resultsDir.mkdir();
+    }
+    var outputPath = new java.io.File(resultsDir, outputFilename).getAbsolutePath();
+    ffufCommand += " -o \"" + outputPath + "\" -of " + OUTPUT_FORMAT;
+    
+    // Copy just the command to clipboard
+    var stringSelection = new java.awt.datatransfer.StringSelection(ffufCommand);
+    var clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+    clipboard.setContents(stringSelection, null);
+    
+    // Success message to Burp output
+    api.logging().logToOutput("✓ ffuf subdomain command copied to clipboard");
+    
+} catch (Exception e) {
+    api.logging().logToError("✗ Failed to generate ffuf command: " + e.getMessage());
+}
