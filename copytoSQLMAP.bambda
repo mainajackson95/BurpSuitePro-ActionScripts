@@ -1,0 +1,52 @@
+// Copy Request to SQLMap - Ready to Run
+// Location: Repeater | Function: Custom Action
+
+// ========== CONFIGURATION ==========
+// Set your SQLMap tool path here
+var SQLMAP_PATH = System.getProperty("user.home") + "/Desktop/tools/sqlmapproject-sqlmap-f44aef3/sqlmap.py";
+// Example paths:
+// var SQLMAP_PATH = "/usr/bin/sqlmap";
+// var SQLMAP_PATH = "/opt/sqlmap/sqlmap.py";
+// var SQLMAP_PATH = System.getProperty("user.home") + "/tools/sqlmap/sqlmap.py";
+// ===================================
+
+var request = requestResponse.request();
+
+// Get user home directory
+var userHome = System.getProperty("user.home");
+
+// Create sqlmap_requests directory if it doesn't exist
+var requestsDir = new java.io.File(userHome, "sqlmap_requests");
+if (!requestsDir.exists()) {
+    requestsDir.mkdir();
+}
+
+// Generate filename with timestamp
+var timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+var host = request.httpService().host();
+var sanitizedHost = host.replaceAll("[^a-zA-Z0-9.-]", "_");
+var filename = "request_" + sanitizedHost + "_" + timestamp + ".txt";
+
+// Full file path
+var filePath = new java.io.File(requestsDir, filename);
+
+try {
+    // Write request to file
+    var writer = new java.io.FileWriter(filePath);
+    writer.write(request.toString());
+    writer.close();
+    
+    // Prepare complete sqlmap command
+    var sqlmapCommand = "python3 " + SQLMAP_PATH + " -r \"" + filePath.getAbsolutePath() + "\" --batch --random-agent";
+    
+    // Copy sqlmap command to clipboard
+    var stringSelection = new java.awt.datatransfer.StringSelection(sqlmapCommand);
+    var clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+    clipboard.setContents(stringSelection, null);
+    
+    // Success message to Burp output
+    api.logging().logToOutput("✓ sqlmap command copied to clipboard");
+    
+} catch (Exception e) {
+    api.logging().logToError("✗ Failed to generate sqlmap command: " + e.getMessage());
+}
