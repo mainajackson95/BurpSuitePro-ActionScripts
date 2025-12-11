@@ -1,0 +1,93 @@
+// Copy Request to ffuf - Recursive Fuzzing Mode
+// Location: Repeater | Function: Custom Action
+// Purpose: Discover subdirectories and fuzz them recursively for more content
+
+// ========== CONFIGURATION ==========
+// Set your ffuf tool path here
+var FFUF_PATH = "ffuf"; // If ffuf is in PATH, just use "ffuf"
+// var FFUF_PATH = "/usr/bin/ffuf";
+// var FFUF_PATH = System.getProperty("user.home") + "/tools/ffuf";
+
+// Set your default wordlist path for directory/file discovery
+var WORDLIST_PATH = "/usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-small.txt";
+// var WORDLIST_PATH = "/usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt";
+// var WORDLIST_PATH = "/usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-directories.txt";
+// var WORDLIST_PATH = "/usr/share/wordlists/dirb/common.txt";
+
+// Recursion settings
+var RECURSION_DEPTH = 2; // How deep to go (1 = check subdirs, 2 = check subdirs of subdirs, etc.)
+var EXTENSIONS = ".php,.html,.txt,.asp,.aspx,.jsp"; // File extensions to check (comma-separated)
+
+// Additional ffuf options
+var MATCH_CODES = "all"; // HTTP codes to match
+var FILTER_CODES = ""; // HTTP codes to filter out (empty = don't filter)
+var RATE_LIMIT = ""; // e.g., "100" for 100 requests/sec, leave empty for no limit
+var THREADS = "40"; // Number of threads (default: 40)
+var AUTO_CALIBRATE = true; // Enable auto-calibration filter (-ac flag)
+
+// Output settings
+var SAVE_OUTPUT = true; // Save results to file
+var OUTPUT_FORMAT = "html"; // json, csv, html, md (recommended: html or md for readability)
+// ===================================
+
+var request = requestResponse.request();
+
+// Get the URL from the request
+var requestUrl = request.url();
+var urlString = requestUrl.toString();
+
+// Check if URL contains FUZZ keyword
+if (!urlString.toUpperCase().contains("FUZZ")) {
+    api.logging().logToError("✗ FUZZ keyword not found - add FUZZ to URL path for recursive fuzzing");
+    return;
+}
+
+// Get user home directory for results
+var userHome = System.getProperty("user.home");
+
+// Generate timestamp for output file
+var timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+var host = request.httpService().host();
+var sanitizedHost = host.replaceAll("[^a-zA-Z0-9.-]", "_");
+
+// Create ffuf_results directory for output files
+var resultsDir = new java.io.File(userHome, "ffuf_results");
+if (!resultsDir.exists() && SAVE_OUTPUT) {
+    resultsDir.mkdir();
+}
+
+try {
+    // Build ffuf command with URL directly
+    var ffufCommand = FFUF_PATH + " -w \"" + WORDLIST_PATH + ":FUZZ\"";
+    ffufCommand += " -u \"" + urlString + "\"";
+    
+    // Add ignore case flag
+    ffufCommand += " -ic";
+    
+    // Add recursion flags
+    ffufCommand += " -recursion -recursion-depth " + RECURSION_DEPTH;
+    
+    // Add extensions
+    if (EXTENSIONS != null && !EXTENSIONS.isEmpty()) {
+        ffufCommand += " -e " + EXTENSIONS;
+    }
+    
+    // Add output file if enabled
+    var outputFilename = "recursive_" + sanitizedHost + "_" + timestamp + "." + OUTPUT_FORMAT;
+    var outputPath = new java.io.File(resultsDir, outputFilename).getAbsolutePath();
+    ffufCommand += " -o \"" + outputPath + "\" -of " + OUTPUT_FORMAT;
+    
+    // Debug: Log the command
+    api.logging().logToOutput("Generated command: " + ffufCommand);
+    
+    // Copy just the command to clipboard
+    var stringSelection = new java.awt.datatransfer.StringSelection(ffufCommand);
+    var clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+    clipboard.setContents(stringSelection, null);
+    
+    // Success message to Burp output
+    api.logging().logToOutput("✓ ffuf recursive command copied to clipboard");
+    
+} catch (Exception e) {
+    api.logging().logToError("✗ Failed to generate ffuf command: " + e.getMessage());
+}
