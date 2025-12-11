@@ -1,0 +1,62 @@
+// Copy Request to ffuf - Ready to Run
+// Location: Repeater | Function: Custom Action
+
+// ========== CONFIGURATION ==========
+// Set your ffuf tool path here
+var FFUF_PATH = "ffuf"; // If ffuf is in PATH, just use "ffuf"
+// var FFUF_PATH = "/usr/bin/ffuf";
+// var FFUF_PATH = System.getProperty("user.home") + "/tools/ffuf";
+
+// Set your default wordlist path
+var WORDLIST_PATH = System.getProperty("user.home") + "/usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-big.txt";
+// var WORDLIST_PATH = "/usr/share/wordlists/dirb/common.txt";
+// var WORDLIST_PATH = "/usr/share/seclists/Discovery/Web-Content/common.txt";
+// ===================================
+
+var request = requestResponse.request();
+
+// Get user home directory
+var userHome = System.getProperty("user.home");
+
+// Create ffuf_requests directory if it doesn't exist
+var requestsDir = new java.io.File(userHome, "ffuf_requests");
+if (!requestsDir.exists()) {
+    requestsDir.mkdir();
+}
+
+// Generate filename with timestamp
+var timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+var host = request.httpService().host();
+var sanitizedHost = host.replaceAll("[^a-zA-Z0-9.-]", "_");
+var filename = "request_" + sanitizedHost + "_" + timestamp + ".txt";
+
+// Full file path
+var filePath = new java.io.File(requestsDir, filename);
+
+try {
+    // Write request to file
+    var writer = new java.io.FileWriter(filePath);
+    writer.write(request.toString());
+    writer.close();
+    
+    // Prepare complete ffuf command
+    var ffufCommand = FFUF_PATH + " -request \"" + filePath.getAbsolutePath() + "\" -w \"" + WORDLIST_PATH + "\" -mc all -fc 404";
+    
+    // Copy ffuf command to clipboard
+    var stringSelection = new java.awt.datatransfer.StringSelection(ffufCommand);
+    var clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+    clipboard.setContents(stringSelection, null);
+    
+    // Log success to Output
+    System.out.println("\n=== ffuf Command Ready ===");
+    System.out.println("✓ Request saved to: " + filePath.getAbsolutePath());
+    System.out.println("✓ ffuf command copied to clipboard!");
+    System.out.println("✓ Paste in terminal and press Enter to run");
+    System.out.println("\nCommand: " + ffufCommand);
+    System.out.println("\nNote: Replace FUZZ keyword in your request where you want to inject payloads");
+    System.out.println("      Edit request file to add FUZZ in parameters, paths, or headers");
+    System.out.println("==========================\n");
+    
+} catch (Exception e) {
+    System.err.println("✗ Failed to save request: " + e.getMessage());
+}
