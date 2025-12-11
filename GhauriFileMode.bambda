@@ -1,0 +1,61 @@
+// Copy Request to Ghauri - Ready to Run
+// Location: Repeater | Function: Custom Action
+
+// ========== CONFIGURATION ==========
+// Set your Ghauri tool path here
+var GHAURI_PATH = "ghauri"; // If ghauri is in PATH, just use "ghauri"
+// var GHAURI_PATH = "/home/kali/.local/bin/ghauri";
+// var GHAURI_PATH = "/usr/bin/ghauri";
+// var GHAURI_PATH = System.getProperty("user.home") + "/tools/ghauri";
+// ===================================
+
+var request = requestResponse.request();
+
+// Get user home directory
+var userHome = System.getProperty("user.home");
+
+// Create ghauri_requests directory if it doesn't exist
+var requestsDir = new java.io.File(userHome, "ghauri_requests");
+if (!requestsDir.exists()) {
+    requestsDir.mkdir();
+}
+
+// Generate filename with timestamp
+var timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+var host = request.httpService().host();
+var sanitizedHost = host.replaceAll("[^a-zA-Z0-9.-]", "_");
+var filename = "request_" + sanitizedHost + "_" + timestamp + ".txt";
+
+// Full file path
+var filePath = new java.io.File(requestsDir, filename);
+
+try {
+    // Write request to file
+    var writer = new java.io.FileWriter(filePath);
+    writer.write(request.toString());
+    writer.close();
+    
+    // Prepare complete ghauri command
+    var ghauriCommand = GHAURI_PATH + " -r \"" + filePath.getAbsolutePath() + "\" --dbs --batch --level 3 --tech=t";
+    
+    // Copy ghauri command to clipboard
+    var stringSelection = new java.awt.datatransfer.StringSelection(ghauriCommand);
+    var clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+    clipboard.setContents(stringSelection, null);
+    
+    // Log success to Output
+    System.out.println("\n=== Ghauri SQL Injection Command Ready ===");
+    System.out.println("✓ Request saved to: " + filePath.getAbsolutePath());
+    System.out.println("✓ Ghauri command copied to clipboard!");
+    System.out.println("✓ Paste in terminal and press Enter to run");
+    System.out.println("\nCommand: " + ghauriCommand);
+    System.out.println("\nFlags used:");
+    System.out.println("  --dbs       : Enumerate databases");
+    System.out.println("  --batch     : Never ask for user input");
+    System.out.println("  --level 3   : Level of tests (1-5)");
+    System.out.println("  --tech=t    : Time-based blind SQL injection");
+    System.out.println("==========================================\n");
+    
+} catch (Exception e) {
+    System.err.println("✗ Failed to save request: " + e.getMessage());
+}
