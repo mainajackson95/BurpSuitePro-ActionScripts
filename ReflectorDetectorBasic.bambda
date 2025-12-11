@@ -1,0 +1,92 @@
+// XSS Reflection Finder
+// Location: Repeater | Function: Custom Action
+
+if (!requestResponse.hasResponse()) {
+    return;
+}
+
+// Get request and response
+var request = requestResponse.request();
+var response = requestResponse.response();
+var responseBody = response.bodyToString();
+var responseBodyLower = responseBody.toLowerCase();
+
+// Extract parameters from request
+var params = request.parameters();
+var reflections = new java.util.ArrayList<String>();
+
+// Check each parameter for reflections
+for (var param : params) {
+    var paramName = param.name();
+    var paramValue = param.value();
+    
+    if (paramValue.isEmpty() || paramValue.length() < 2) {
+        continue;
+    }
+    
+    // Count occurrences in response
+    var valueLower = paramValue.toLowerCase();
+    var count = 0;
+    var index = 0;
+    
+    while ((index = responseBodyLower.indexOf(valueLower, index)) != -1) {
+        count++;
+        index += valueLower.length();
+    }
+    
+    if (count > 0) {
+        // Check context (basic detection)
+        var contexts = new java.util.HashSet<String>();
+        index = 0;
+        
+        while ((index = responseBodyLower.indexOf(valueLower, index)) != -1) {
+            var start = Math.max(0, index - 30);
+            var end = Math.min(responseBodyLower.length(), index + valueLower.length() + 30);
+            var context = responseBody.substring(start, end);
+            
+            // Detect context type
+            if (context.contains("<script")) {
+                contexts.add("JavaScript");
+            } else if (context.matches(".*<[^>]*" + java.util.regex.Pattern.quote(valueLower) + "[^>]*>.*")) {
+                contexts.add("HTML Tag");
+            } else if (context.matches(".*\"[^\"]*" + java.util.regex.Pattern.quote(valueLower) + "[^\"]*\".*")) {
+                contexts.add("Attribute");
+            } else if (context.contains("<")) {
+                contexts.add("HTML Content");
+            } else {
+                contexts.add("Text");
+            }
+            
+            index += valueLower.length();
+        }
+        
+        var contextStr = String.join(", ", contexts);
+        reflections.add(String.format("✓ '%s' = '%s' reflected %d time(s) in: [%s]", 
+            paramName, paramValue, count, contextStr));
+    }
+}
+
+// Display results
+if (!reflections.isEmpty()) {
+    var message = String.join("\n", reflections);
+    var fullReport = "=== XSS REFLECTION ANALYSIS ===\n" +
+                     "URL: " + request.url() + "\n\n" +
+                     message + "\n" +
+                     "================================";
+    
+    // Copy to clipboard
+    var stringSelection = new java.awt.datatransfer.StringSelection(fullReport);
+    var clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+    clipboard.setContents(stringSelection, null);
+    
+    api.logging().logToOutput("✓ XSS Reflection results copied to clipboard (" + reflections.size() + " reflections found)");
+} else {
+    var noReflectionMsg = "No parameter reflections detected in the response\nURL: " + request.url();
+    
+    // Copy to clipboard
+    var stringSelection = new java.awt.datatransfer.StringSelection(noReflectionMsg);
+    var clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+    clipboard.setContents(stringSelection, null);
+    
+    api.logging().logToOutput("✓ Results copied to clipboard (no reflections found)");
+}
