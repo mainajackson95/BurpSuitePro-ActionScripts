@@ -1,0 +1,83 @@
+// Copy Request to ffuf - POST Parameter Fuzzing Mode
+// Location: Repeater | Function: Custom Action
+// Purpose: Discover POST parameters using parameter name fuzzing
+
+// ========== CONFIGURATION ==========
+// Set your ffuf tool path here
+var FFUF_PATH = "ffuf"; // If ffuf is in PATH, just use "ffuf"
+// var FFUF_PATH = "/usr/bin/ffuf";
+// var FFUF_PATH = System.getProperty("user.home") + "/tools/ffuf";
+
+// Set your default wordlist path for parameter discovery
+var WORDLIST_PATH = "/usr/share/wordlists/seclists/Discovery/Web-Content/burp-parameter-names.txt";
+// var WORDLIST_PATH = "/usr/share/wordlists/seclists/Discovery/Web-Content/raft-medium-words.txt";
+
+// Default parameter value to test with
+var PARAM_VALUE = "key";
+
+// Filter size (set to empty string to not filter, or set a size like "1234")
+var FILTER_SIZE = ""; // e.g., "1234" to filter responses of size 1234 bytes
+// var FILTER_SIZE = "xxx"; // Replace xxx with actual size after initial test
+
+// Output settings
+var SAVE_OUTPUT = true; // Save results to file
+var OUTPUT_FORMAT = "html"; // json, csv, html, md (recommended: html or md for readability)
+// ===================================
+
+var request = requestResponse.request();
+
+try {
+    // Extract URL from request
+    var protocol = request.httpService().secure() ? "https://" : "http://";
+    var host = request.httpService().host();
+    var port = request.httpService().port();
+    var portStr = (port == 80 || port == 443) ? "" : ":" + port;
+    var path = request.path();
+    
+    // Remove query string if present
+    var basePath = path;
+    var questionMark = path.indexOf('?');
+    if (questionMark != -1) {
+        basePath = path.substring(0, questionMark);
+    }
+    
+    // Build URL
+    var fullUrl = protocol + host + portStr + basePath;
+    
+    // Prepare complete ffuf command
+    var ffufCommand = FFUF_PATH + " -w \"" + WORDLIST_PATH + ":FUZZ\"";
+    ffufCommand += " -u \"" + fullUrl + "\"";
+    ffufCommand += " -X POST";
+    ffufCommand += " -d 'FUZZ=" + PARAM_VALUE + "'";
+    ffufCommand += " -H 'Content-Type: application/x-www-form-urlencoded'";
+    
+    // Add filter size if specified
+    if (FILTER_SIZE != null && !FILTER_SIZE.isEmpty() && !FILTER_SIZE.equals("xxx")) {
+        ffufCommand += " -fs " + FILTER_SIZE;
+    }
+    
+    // Add output file if enabled
+    if (SAVE_OUTPUT && OUTPUT_FORMAT != null && !OUTPUT_FORMAT.isEmpty()) {
+        var userHome = System.getProperty("user.home");
+        var timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+        var sanitizedHost = host.replaceAll("[^a-zA-Z0-9.-]", "_");
+        var outputFilename = "post_param_" + sanitizedHost + "_" + timestamp + "." + OUTPUT_FORMAT;
+        var resultsDir = new java.io.File(userHome, "ffuf_results");
+        if (!resultsDir.exists()) {
+            resultsDir.mkdir();
+        }
+        var outputPath = new java.io.File(resultsDir, outputFilename).getAbsolutePath();
+        ffufCommand += " -o \"" + outputPath + "\" -of " + OUTPUT_FORMAT;
+    }
+    
+    // Copy ffuf command to clipboard
+    var stringSelection = new java.awt.datatransfer.StringSelection(ffufCommand);
+    var clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+    clipboard.setContents(stringSelection, null);
+    
+    // Success message to Burp output
+    api.logging().logToOutput("✓ ffuf POST parameter fuzzing command copied to clipboard");
+    
+} catch (Exception e) {
+    api.logging().logToError("✗ Failed to generate ffuf command: " + e.getMessage());
+}
