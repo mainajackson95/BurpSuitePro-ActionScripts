@@ -1,0 +1,90 @@
+// Copy Request to ghauri - SQL Injection Testing (URL Mode)
+// Location: Repeater | Function: Custom Action
+// Purpose: Test for SQL injection vulnerabilities using ghauri with direct URL
+
+// ========== CONFIGURATION ==========
+// Set your ghauri tool path here
+var GHAURI_PATH = "/home/kaisec/tools-venv/bin/ghauri"; // Ghauri in virtual environment
+// var GHAURI_PATH = "ghauri"; // If ghauri is in PATH, just use "ghauri"
+// var GHAURI_PATH = "/usr/bin/ghauri";
+
+// Default options
+var BATCH_MODE = true; // Run in batch mode (no user interaction)
+var ENUMERATE_DBS = true; // Enumerate databases (--dbs)
+var LEVEL = 3; // Test level (1-5, default: 3)
+var CONFIRM = true; // Confirm injection (--confirm)
+
+// Additional options (set to true to enable)
+var ENUMERATE_TABLES = false; // Enumerate tables (--tables)
+var ENUMERATE_COLUMNS = false; // Enumerate columns (--columns)
+var DUMP_DATA = false; // Dump table data (--dump)
+var CURRENT_USER = false; // Get current user (--current-user)
+var CURRENT_DB = false; // Get current database (--current-db)
+// ===================================
+
+var request = requestResponse.request();
+
+try {
+    // Extract URL from request
+    var protocol = request.httpService().secure() ? "https://" : "http://";
+    var host = request.httpService().host();
+    var port = request.httpService().port();
+    var portStr = (port == 80 || port == 443) ? "" : ":" + port;
+    var path = request.path();
+    
+    // Build full URL
+    var fullUrl = protocol + host + portStr + path;
+    
+    // Build ghauri command
+    var ghauriCommand = GHAURI_PATH + " -u \"" + fullUrl + "\"";
+    
+    // Add batch mode
+    if (BATCH_MODE) {
+        ghauriCommand += " --batch";
+    }
+    
+    // Add database enumeration
+    if (ENUMERATE_DBS) {
+        ghauriCommand += " --dbs";
+    }
+    
+    // Add level
+    ghauriCommand += " --level " + LEVEL;
+    
+    // Add confirm
+    if (CONFIRM) {
+        ghauriCommand += " --confirm";
+    }
+    
+    // Add additional options
+    if (ENUMERATE_TABLES) {
+        ghauriCommand += " --tables";
+    }
+    
+    if (ENUMERATE_COLUMNS) {
+        ghauriCommand += " --columns";
+    }
+    
+    if (DUMP_DATA) {
+        ghauriCommand += " --dump";
+    }
+    
+    if (CURRENT_USER) {
+        ghauriCommand += " --current-user";
+    }
+    
+    if (CURRENT_DB) {
+        ghauriCommand += " --current-db";
+    }
+    
+    // Copy command to clipboard
+    var stringSelection = new java.awt.datatransfer.StringSelection(ghauriCommand);
+    var clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+    clipboard.setContents(stringSelection, null);
+    
+    // Success message to Burp output
+    api.logging().logToOutput("✓ ghauri URL-based SQL injection command copied to clipboard");
+    
+} catch (Exception e) {
+    api.logging().logToError("✗ Failed to generate ghauri command: " + e.getMessage());
+}
